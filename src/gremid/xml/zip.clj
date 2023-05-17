@@ -58,6 +58,5 @@
 (defn next-locs
   "Returns a lazy sequence of locations following and starting with loc."
   [loc]
-  (lazy-seq
-   (when loc
-     (cons loc (when-not (zip/end? loc) (next-locs (zip/next loc)))))))
+  (when (and loc (not (zip/end? loc)))
+    (lazy-seq (cons loc (next-locs (zip/next loc))))))
