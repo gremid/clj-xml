@@ -318,6 +318,9 @@
              :attrs   attrs
              :content (mapcat sexp->nodes content)})))
 
+  clojure.lang.IPersistentMap
+  (sexp->nodes [m] (list m))
+
   clojure.lang.ISeq
   (sexp->nodes [s] (mapcat sexp->nodes s))
 
