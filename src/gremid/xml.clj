@@ -3,6 +3,7 @@
    [clojure.string :as str])
   (:import
    (java.io File InputStream OutputStream Reader StringReader Writer)
+   (java.nio.file Path)
    (java.net URI URL)
    (java.util Collections)
    (javax.xml XMLConstants)
@@ -38,6 +39,11 @@
   File
   (as-source [^File v] (StreamSource. v))
   (as-input-source [^File v] (as-input-source (.toURI v)))
+  (close! [_])
+
+  Path
+  (as-source [^Path v] (as-source (.toFile v)))
+  (as-input-source [^Path v] (as-input-source (.toFile v)))
   (close! [_])
 
   URI
