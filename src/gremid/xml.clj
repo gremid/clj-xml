@@ -8,7 +8,7 @@
    (java.util Collections)
    (javax.xml XMLConstants)
    (javax.xml.namespace QName)
-   (javax.xml.stream XMLEventFactory XMLEventReader XMLEventWriter XMLInputFactory XMLOutputFactory XMLStreamConstants)
+   (javax.xml.stream Location XMLEventFactory XMLEventReader XMLEventWriter XMLInputFactory XMLOutputFactory XMLStreamConstants)
    (javax.xml.stream.events Attribute Characters Comment ProcessingInstruction StartElement XMLEvent)
    (javax.xml.transform Result Source)
    (javax.xml.transform.dom DOMResult DOMSource)
@@ -119,11 +119,14 @@
     (transient (array-map))
     (iterator-seq (.getAttributes event)))))
 
-(defn event->node
-  [^StartElement event]
-  (let [attrs (attrs->map event)]
-    {:tag   (qname->kw (->qname event))
-     :attrs (when (seq attrs) attrs)}))
+(defn assoc-location
+  [node li? ^XMLEvent event]
+  (cond-> node
+    li? (assoc :location
+               (let [^Location location (. event (getLocation))]
+                 {:char   (. location (getCharacterOffset))
+                  :line   (. location (getLineNumber))
+                  :column (. location (getColumnNumber))}))))
 
 (defn append-child!
   [current child]
@@ -140,7 +143,7 @@
   {:tag :<< :attrs nil})
 
 (defn events->node
-  [events]
+  [events & {li? :location-info? :or {li? false}}]
   (let [stack         (volatile! nil)
         current       (volatile! document-node)
         char-buf      (volatile! (StringBuilder.))
@@ -154,7 +157,11 @@
             (do
               (append-text!)
               (vswap! stack conj @current)
-              (vreset! current (event->node event)))
+              (vreset! current
+                       (let [attrs (attrs->map event)]
+                         (-> {:tag   (qname->kw (->qname event))
+                                  :attrs (when (seq attrs) attrs)}
+                           (assoc-location li? event)))))
             XMLStreamConstants/END_ELEMENT
             (do
               (append-text!)
@@ -165,19 +172,23 @@
             XMLStreamConstants/PROCESSING_INSTRUCTION
             (let [^ProcessingInstruction pi event]
               (append-text!)
-              (append-child! {:tag   :<?
-                              :attrs {:target (.getTarget pi)
-                                      :data   (.getData pi)}}))
+              (append-child! (-> {:tag   :<?
+                                  :attrs {:target (.getTarget pi)
+                                          :data   (.getData pi)}}
+                               (assoc-location li? event))))
             XMLStreamConstants/COMMENT
             (let [^Comment comment event]
               (append-text!)
-              (append-child! {:tag   :<!
-                              :attrs {:text (.getText comment)}}))
+              (append-child! (-> {:tag   :<!
+                                  :attrs {:text (.getText comment)}}
+                                 (assoc-location li? event))))
             XMLStreamConstants/CDATA
             (do
               (append-text!)
-              (append-child! {:tag     :<c
-                              :content (list (.getData ^Characters event))}))
+              (append-child! (->
+                              {:tag     :<c
+                               :content (list (.getData ^Characters event))}
+                              (assoc-location li? event))))
             XMLStreamConstants/CHARACTERS
             (.append ^StringBuilder @char-buf (.getData ^Characters event))
             ;; skip
